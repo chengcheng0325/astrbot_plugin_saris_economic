@@ -66,7 +66,7 @@ def get_hitokoto():
             return None
 
 
-@register("Economic", "城城", "经济插件", "1.0.0")
+@register("Economic", "城城", "经济插件", "0.2.0")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -164,3 +164,4 @@ class EconomicPlugin(Star):
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
+        
