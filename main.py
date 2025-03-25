@@ -10,157 +10,170 @@ import time
 import random
 from data.plugins.astrbot_plugin_database.main import open_databases, DATABASE_FILE
 
-# 路径配置output_path
+# 路径配置
 PLUGIN_DIR = os.path.join('data', 'plugins', 'astrbot_plugin_economic')
 IMAGE_FOLDER = os.path.join(PLUGIN_DIR, "backgrounds")
 FONT_PATH = os.path.join(PLUGIN_DIR, "font.ttf")
-# OUTPUT_PATH = os.path.join('data', "output_path")
+
+# 确定输出路径：优先尝试当前工作目录下的 data/sign_image，否则使用插件目录
 RUNNING_SCRIPT_DIRECTORY = os.getcwd()
-OUTPUT_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, os.path.join('data', 'output_path'))
+OUTPUT_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, 'data', 'sign_image')
+# if not os.path.exists(OUTPUT_PATH):
+#     OUTPUT_PATH = os.path.join(PLUGIN_DIR, 'output')  # 如果当前目录没有，则使用插件目录
+#     os.makedirs(OUTPUT_PATH, exist_ok=True)
+#     logger.warning(f"输出路径不存在，已使用插件目录下的输出路径: {OUTPUT_PATH}")
 
 def get_formatted_time():
     """
-    获取格式化后的时间字符串，格式为：2025-3-24 01:09:32 星期三
+    获取格式化后的时间字符串，格式为：YYYY-MM-DD HH:MM:SS 星期X
     """
     now = datetime.datetime.now()
-    # 获取年份、月份、日期
-    year = now.year
-    month = now.month
-    day = now.day
-    # 获取小时、分钟、秒
-    hour = now.hour
-    minute = now.minute
-    second = now.second
-    # 获取星期几（返回 0-6，0 代表星期一）
-    weekday = now.weekday()
-    # 将数字星期转换为中文星期
     weekday_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
-    weekday_name = weekday_names[weekday]
-    # 格式化时间字符串
-    formatted_time = f"{year}-{month}-{day} {hour:02}:{minute:02}:{second:02} {weekday_name}"
-    return formatted_time
+    weekday_name = weekday_names[now.weekday()]
+    return now.strftime(f"%Y-%m-%d %H:%M:%S {weekday_name}")
+
 
 def get_hitokoto():
     """
-    从 https://hitokoto.152710.xyz/ 获取一句一言（hitokoto）。
-    返回一个包含 JSON 数据的字典。
+    从 https://hitokoto.152710.xyz/ 获取一句一言。
+    进行错误处理和重试机制，保证服务的稳定性。
     """
-    max_retries = 5
+    max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = requests.get("https://hitokoto.152710.xyz/")
-            # 检查请求是否成功
-            response.raise_for_status()  # 如果状态码不是 200，则抛出 HTTPError 异常
-            # 解析 JSON 响应
+            response = requests.get("https://hitokoto.152710.xyz/", timeout=5)  # 添加超时时间
+            response.raise_for_status()  # 检查 HTTP 状态码
             data = response.json()
             return data
         except requests.exceptions.RequestException as e:
-            if response.status_code == 429 and attempt < max_retries - 1:
-                print(f"请求过多，等待 5 秒后重试... ({attempt + 1}/{max_retries})")
-                time.sleep(5)
+            logger.warning(f"请求 hitokoto 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2 * (attempt + 1))  # 增加重试间隔
             else:
-                print(f"请求出错: {e}")
-                return None  # 或抛出异常，取决于你的错误处理策略
+                logger.error(f"获取 hitokoto 失败: {e}")
+                return None
         except json.JSONDecodeError as e:
-            print(f"JSON 解析出错: {e}")
+            logger.error(f"JSON 解析 hitokoto 失败: {e}")
             return None
+    return None
 
 
-@register("Economic", "城城", "经济插件", "0.2.0")
+@register("Economic", "城城", "经济插件", "0.2.1")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
+        self._init_env()
         self.database_plugin = self.context.get_registered_star("Database")
-        if self.database_plugin is None:
-            logger.error("缺少 Database 插件，请先加载该插件。")
-        # 确保获取的是一个实例，并且拥有 config 和 database_file 属性
+        if not self.database_plugin or not self.database_plugin.activated:
+            logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_database.\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_database")
+            self.database_plugin_config = None  # 为了避免后续使用未初始化的属性
+            self.database_plugin_activated = False
         else:
             self.database_plugin_config = self.database_plugin.config
-    
+            self.database_plugin_activated = True
+
     def _init_env(self):
-        # os.makedirs(os.path.dirname(DATABASE_FILE), exist_ok=True)
+        """
+        初始化插件环境，确保输出路径存在。
+        """
         os.makedirs(OUTPUT_PATH, exist_ok=True)
+        logger.info("------ Economic ------")
+        logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
+        logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_economic/issues 提出 issue")
+        logger.info("或加作者QQ: 3079233608 进行反馈。")
+        logger.info("------ Economic ------")
 
-    @filter.command("签到")
-    async def helloworld(self, event: AstrMessageEvent):
-        '''签到功能'''
-        if self.database_plugin is None:
-            yield event.plain_result(f"缺少 Database 插件，签到功能无法使用。")
+    def getGroupUserIdentity(self, is_admin: bool, user_id: str, owner: str):
+        """
+        判断用户在群内的身份。
+        """
+        if is_admin:
+            return "管理员"
+        elif user_id == owner:
+            return "群主"
+        else:
+            return "普通用户"
+
+    @filter.command("签到",alias={'info', 'sign'})
+    async def sign_in(self, event: AstrMessageEvent):
+        """
+        签到功能：
+        - 检查数据库插件是否已加载。
+        - 获取用户信息和群信息。
+        - 生成签到卡片并发送。
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_database。\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_database")
             return
-        
-        user_id = event.get_sender_id()         # 获取用户 ID
 
+        user_id = event.get_sender_id()
         try:
-            with open_databases(self.database_plugin_config,DATABASE_FILE, user_id) as (db_user, db_economy):
-                user_name = event.get_sender_name()     # 获取用户名
-                admin = event.message_obj               # 判断是否为管理员
-                if admin:
-                    admin = "管理员"
-                else:
-                    admin = "普通用户"
-                formatted_time = get_formatted_time()   # 获取格式化的时间字符串
-                sign_number = db_user.query_sign_in_count()           # 查询用户签到次数
+            with open_databases(self.database_plugin_config, DATABASE_FILE, user_id) as (db_user, db_economy):
+                user_name = event.get_sender_name()
+                group = await event.get_group(group_id=event.message_obj.group_id)
+                owner = group.group_owner
+                is_admin = event.is_admin()
+                identity = self.getGroupUserIdentity(is_admin, user_id, owner)
+                formatted_time = get_formatted_time()
+                sign_in_count = db_user.query_sign_in_count()[0]  # 获取签到次数的第一个元素
                 hitokoto_data = get_hitokoto()
-                random_number = round(random.uniform(50, 100), 2)  # 生成 50 到 100 之间的浮点数
-                
-                Sign_date = db_user.query_last_sign_in_date()
-                # logger.info(f"签到日期: {Sign_date}")
-                now = datetime.datetime.now().strftime("%Y-%m-%d")
+
+                # 默认值，防止hitokoto获取失败造成错误
+                hitokoto = "今日一言获取失败"
+                hitokoto_source = "未知"
+
+                if hitokoto_data:
+                    hitokoto = hitokoto_data.get("hitokoto", "今日一言获取失败")
+                    hitokoto_source = f"————{hitokoto_data.get('from', '未知')} - {hitokoto_data.get('from_who', '未知')}"
+
+                last_sign_in_date = db_user.query_last_sign_in_date()
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
                 user_economy = db_economy.get_economy()[0]
-                user_info = [
-                    user_id,
-                    admin,
-                    user_name
-                ]
+
+                sign_in_reward = 0  # 签到奖励
+                is_signed_today = (last_sign_in_date == today)
+
+                if not is_signed_today:
+                    sign_in_reward = round(random.uniform(50, 100), 2)
+                    db_user.update_sign_in(sign_in_reward)
+                    db_economy.add_economy(sign_in_reward)
+                    user_economy += sign_in_reward
+
+                user_info = [user_id, identity, user_name]
                 bottom_left_info = [
                     f"当前时间: {formatted_time}",
+                    f"签到日期: {today if not is_signed_today else last_sign_in_date}",
+                    f"金币: {user_economy:.2f}"  # 格式化为两位小数
                 ]
-                bottom_right_top_info = []
+
+                bottom_right_top_info = [
+                    "今日已签到" if is_signed_today else "签到成功",
+                    f"签到天数: {sign_in_count}" if is_signed_today else f"签到天数: {sign_in_count + 1}",
+                    f"获取金币: {db_user.query_sign_in_coins() if is_signed_today else sign_in_reward:.2f}"  # 格式化为两位小数
+                ]
 
                 bottom_right_bottom_info = [
-                    f"{hitokoto_data['hitokoto']}"
-                    "\n",
-                    f"————{hitokoto_data['from']} - {hitokoto_data['from_who']}"
+                    hitokoto,
+                    hitokoto_source,
                 ]
-                if Sign_date < now:
-                    db_user.update_sign_in(random_number)
-                    db_economy.add_economy(random_number)
-
-                    bottom_left_info.append(f"签到日期: {now}")
-                    bottom_left_info.append(f"金币: {user_economy+random_number}")
-
-                    bottom_right_top_info.append(f"签到成功")
-                    bottom_right_top_info.append(f"签到天数: {sign_number[0]+1}")
-                    bottom_right_top_info.append(f"获取金币: {random_number}")
-
-                else:
-                    bottom_left_info.append(f"签到日期: {Sign_date}")
-                    bottom_left_info.append(f"金币: {user_economy}")
-
-                    bottom_right_top_info.append(f"今日已签到")
-                    bottom_right_top_info.append(f"签到天数: {sign_number[0]}")
-                    bottom_right_top_info.append(f"获取金币: {db_user.query_sign_in_coins()}")
 
                 sign_image = create_check_in_card(
-                    avatar_path=f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640",                            # 头像路径
-                    user_info=user_info,                                # 用户信息
-                    bottom_left_info=bottom_left_info,                  # 左下角信息
-                    bottom_right_top_info=bottom_right_top_info,        # 右下角上部信息
-                    bottom_right_bottom_info=bottom_right_bottom_info,  # 右下角下部信息
-                    output_path=os.path.join(OUTPUT_PATH, f"{user_id}.png"),         # 输出文件名
-                    image_folder=IMAGE_FOLDER,                          # 背景图片文件夹
-                    font_path=FONT_PATH                                 # 字体文件路径  
+                    avatar_path=f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640",
+                    user_info=user_info,
+                    bottom_left_info=bottom_left_info,
+                    bottom_right_top_info=bottom_right_top_info,
+                    bottom_right_bottom_info=bottom_right_bottom_info,
+                    output_path=os.path.join(OUTPUT_PATH, f"{user_id}.png"),
+                    image_folder=IMAGE_FOLDER,
+                    font_path=FONT_PATH
                 )
-                yield event.image_result(sign_image) # 发送图片
-                logger.info(f"签到成功，签到图片已保存至" + os.path.join(OUTPUT_PATH, f"{user_id}.png"))
-
-
-
+                yield event.image_result(sign_image)
+                logger.info(f"用户 {user_id} 签到成功，签到卡片已保存至 {os.path.join(OUTPUT_PATH, f'{user_id}.png')}")
 
         except Exception as e:
-            logger.error(f"调用 open_databases 失败: {e}")
-            yield event.plain_result(f"签到时发生错误，请稍后再试。") # 通知用户签到失败，避免用户困惑
-            return # 确保退出函数，避免执行后续可能出错的代码
+            logger.exception(f"用户 {user_id} 签到失败: {e}")
+            yield event.plain_result("签到时发生错误，请稍后再试。")
+
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
