@@ -7,8 +7,6 @@
 
 **版本：** v0.2.0 (当前版本号)
 
-(需要前置[astrbot_plugin_database](https://github.com/chengcheng0325/astrbot_plugin_database)插件)
-
 ---
 
 ## 功能特性
