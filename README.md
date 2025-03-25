@@ -1,9 +1,25 @@
-# helloworld
 
-AstrBot 插件模板
+# [astrbot_plugin_economic](https://github.com/chengcheng0325/astrbot_plugin_economic/tree/master)
 
-A template plugin for AstrBot plugin feature
+**插件别名：** 经济
 
-# 支持
+**作者：** [城城](https://github.com/chengcheng0325)
 
-[帮助文档](https://astrbot.app)
+**版本：** v0.2.0 (当前版本号)
+
+---
+
+## 功能特性
+
+ - [x] 签到 [获取签到图片,可以自定义背景图片[data\plugins\astrbot_plugin_economic\backgrounds]]
+ - [ ] 转账
+ - [ ] 商店
+
+**依赖项：**
+
+*  [astrbot_plugin_database](https://github.com/chengcheng0325/astrbot_plugin_database) v0.1.0
+
+## 展示
+
+![b866f6082ce61700f34dd0d90695bc3f](https://github.com/user-attachments/assets/48889f42-cc2e-4eb9-b91a-884e21fac35e)
+![f7efc83790b6bd22da6f31f2ab85a073](https://github.com/user-attachments/assets/403285d6-68a8-4229-9497-6694caa26959)
