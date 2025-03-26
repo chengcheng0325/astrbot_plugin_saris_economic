@@ -5,7 +5,7 @@
 
 **作者：** [城城](https://github.com/chengcheng0325)
 
-**版本：** v0.2.1 (当前版本号)
+**版本：** v0.2.2 (当前版本号)
 
 ---
 
@@ -17,7 +17,7 @@
 
 **依赖项：**
 
-*  [astrbot_plugin_saris_db](https://github.com/chengcheng0325/astrbot_plugin_saris_db) v0.1.0
+*  [astrbot_plugin_saris_db](https://github.com/chengcheng0325/astrbot_plugin_saris_db) v0.1.2
 
 ## 展示
 

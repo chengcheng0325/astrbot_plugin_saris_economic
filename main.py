@@ -10,12 +10,15 @@ import json
 import time
 import random
 import re
-from data.plugins.astrbot_plugin_database.main import open_databases, DATABASE_FILE
+from data.plugins.astrbot_plugin_saris_db.main import open_databases, DATABASE_FILE
+
 
 # 路径配置
 PLUGIN_DIR = os.path.join('data', 'plugins', 'astrbot_plugin_saris_economic')
 IMAGE_FOLDER = os.path.join(PLUGIN_DIR, "backgrounds")
 FONT_PATH = os.path.join(PLUGIN_DIR, "font.ttf")
+RUNNING_SCRIPT_DIRECTORY = os.getcwd()
+
 
 # 确定输出路径：优先尝试当前工作目录下的 data/sign_image，否则使用插件目录
 RUNNING_SCRIPT_DIRECTORY = os.getcwd()
@@ -60,7 +63,7 @@ def get_hitokoto():
     return None
 
 
-@register("Economic", "城城", "经济插件", "0.2.1")
+@register("Economic", "城城", "经济插件", "0.2.2")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -73,6 +76,8 @@ class EconomicPlugin(Star):
         else:
             self.database_plugin_config = self.database_plugin.config
             self.database_plugin_activated = True
+            
+
 
     def _init_env(self):
         """
