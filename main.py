@@ -1,6 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from astrbot.api.all import *
 from .SignIn import create_check_in_card
 import os
 import datetime
@@ -8,10 +9,11 @@ import requests
 import json
 import time
 import random
+import re
 from data.plugins.astrbot_plugin_database.main import open_databases, DATABASE_FILE
 
 # 路径配置
-PLUGIN_DIR = os.path.join('data', 'plugins', 'astrbot_plugin_economic')
+PLUGIN_DIR = os.path.join('data', 'plugins', 'astrbot_plugin_saris_economic')
 IMAGE_FOLDER = os.path.join(PLUGIN_DIR, "backgrounds")
 FONT_PATH = os.path.join(PLUGIN_DIR, "font.ttf")
 
@@ -63,9 +65,9 @@ class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self._init_env()
-        self.database_plugin = self.context.get_registered_star("Database")
+        self.database_plugin = self.context.get_registered_star("saris_db")
         if not self.database_plugin or not self.database_plugin.activated:
-            logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_database.\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_database")
+            logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_saris_db.\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_saris_db")
             self.database_plugin_config = None  # 为了避免后续使用未初始化的属性
             self.database_plugin_activated = False
         else:
@@ -79,7 +81,7 @@ class EconomicPlugin(Star):
         os.makedirs(OUTPUT_PATH, exist_ok=True)
         logger.info("------ Economic ------")
         logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
-        logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_economic/issues 提出 issue")
+        logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
         logger.info("或加作者QQ: 3079233608 进行反馈。")
         logger.info("------ Economic ------")
 
@@ -103,7 +105,7 @@ class EconomicPlugin(Star):
         - 生成签到卡片并发送。
         """
         if not self.database_plugin_activated:
-            yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_database。\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_database")
+            yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_saris_db")
             return
 
         user_id = event.get_sender_id()
@@ -173,7 +175,6 @@ class EconomicPlugin(Star):
         except Exception as e:
             logger.exception(f"用户 {user_id} 签到失败: {e}")
             yield event.plain_result("签到时发生错误，请稍后再试。")
-
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''

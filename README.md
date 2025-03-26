@@ -1,11 +1,11 @@
 
-# [astrbot_plugin_economic](https://github.com/chengcheng0325/astrbot_plugin_economic/tree/master)
+# [astrbot_plugin_saris_economic](https://github.com/chengcheng0325/astrbot_plugin_saris_economic/tree/master)
 
 **插件别名：** 经济
 
 **作者：** [城城](https://github.com/chengcheng0325)
 
-**版本：** v0.2.0 (当前版本号)
+**版本：** v0.2.1 (当前版本号)
 
 ---
 
@@ -17,7 +17,7 @@
 
 **依赖项：**
 
-*  [astrbot_plugin_database](https://github.com/chengcheng0325/astrbot_plugin_database) v0.1.0
+*  [astrbot_plugin_saris_db](https://github.com/chengcheng0325/astrbot_plugin_saris_db) v0.1.0
 
 ## 展示
 
