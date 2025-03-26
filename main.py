@@ -84,11 +84,11 @@ class EconomicPlugin(Star):
         初始化插件环境，确保输出路径存在。
         """
         os.makedirs(OUTPUT_PATH, exist_ok=True)
-        logger.info("------ Economic ------")
+        logger.info("------ saris_Economic ------")
         logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
         logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
         logger.info("或加作者QQ: 3079233608 进行反馈。")
-        logger.info("------ Economic ------")
+        logger.info("------ saris_Economic ------")
 
     def getGroupUserIdentity(self, is_admin: bool, user_id: str, owner: str):
         """
