@@ -58,7 +58,7 @@ def get_one_sentence():
     return None
 
 
-@register("Economic", "城城", "经济插件", "0.2.3")
+@register("Economic", "城城", "经济插件", "0.2.4")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -113,7 +113,7 @@ class EconomicPlugin(Star):
 
         user_id = event.get_sender_id()
         try:
-            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy):
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish):
                 user_name = event.get_sender_name()
                 group = await event.get_group(group_id=event.message_obj.group_id)
                 owner = group.group_owner
