@@ -10,23 +10,17 @@ import json
 import time
 import random
 import re
-from data.plugins.astrbot_plugin_saris_db.main import open_databases, DATABASE_FILE
 
 
 # 路径配置
 PLUGIN_DIR = os.path.join('data', 'plugins', 'astrbot_plugin_saris_economic')
 IMAGE_FOLDER = os.path.join(PLUGIN_DIR, "backgrounds")
 FONT_PATH = os.path.join(PLUGIN_DIR, "font.ttf")
-RUNNING_SCRIPT_DIRECTORY = os.getcwd()
 
 
 # 确定输出路径：优先尝试当前工作目录下的 data/sign_image，否则使用插件目录
 RUNNING_SCRIPT_DIRECTORY = os.getcwd()
 OUTPUT_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, 'data', 'sign_image')
-# if not os.path.exists(OUTPUT_PATH):
-#     OUTPUT_PATH = os.path.join(PLUGIN_DIR, 'output')  # 如果当前目录没有，则使用插件目录
-#     os.makedirs(OUTPUT_PATH, exist_ok=True)
-#     logger.warning(f"输出路径不存在，已使用插件目录下的输出路径: {OUTPUT_PATH}")
 
 def get_formatted_time():
     """
@@ -38,32 +32,33 @@ def get_formatted_time():
     return now.strftime(f"%Y-%m-%d %H:%M:%S {weekday_name}")
 
 
-def get_hitokoto():
+def get_one_sentence():
     """
-    从 https://hitokoto.152710.xyz/ 获取一句一言。
+    从 https://api.tangdouz.com/a/one.php?return=json 获取一句一言。
     进行错误处理和重试机制，保证服务的稳定性。
     """
     max_retries = 3
+    url = "https://api.tangdouz.com/a/one.php?return=json"
     for attempt in range(max_retries):
         try:
-            response = requests.get("https://hitokoto.152710.xyz/", timeout=5)  # 添加超时时间
+            response = requests.get(url, timeout=5)  # 添加超时时间
             response.raise_for_status()  # 检查 HTTP 状态码
             data = response.json()
             return data
         except requests.exceptions.RequestException as e:
-            logger.warning(f"请求 hitokoto 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            logger.warning(f"请求 one_sentence 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 time.sleep(2 * (attempt + 1))  # 增加重试间隔
             else:
-                logger.error(f"获取 hitokoto 失败: {e}")
+                logger.error(f"获取 one_sentence 失败: {e}")
                 return None
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 解析 hitokoto 失败: {e}")
+            logger.error(f"JSON 解析 one_sentence 失败: {e}")
             return None
     return None
 
 
-@register("Economic", "城城", "经济插件", "0.2.2")
+@register("Economic", "城城", "经济插件", "0.2.3")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -76,6 +71,9 @@ class EconomicPlugin(Star):
         else:
             self.database_plugin_config = self.database_plugin.config
             self.database_plugin_activated = True
+            from data.plugins.astrbot_plugin_saris_db.main import open_databases, DATABASE_FILE
+            self.open_databases = open_databases
+            self.DATABASE_FILE = DATABASE_FILE
             
 
 
@@ -115,7 +113,7 @@ class EconomicPlugin(Star):
 
         user_id = event.get_sender_id()
         try:
-            with open_databases(self.database_plugin_config, DATABASE_FILE, user_id) as (db_user, db_economy):
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy):
                 user_name = event.get_sender_name()
                 group = await event.get_group(group_id=event.message_obj.group_id)
                 owner = group.group_owner
@@ -123,15 +121,15 @@ class EconomicPlugin(Star):
                 identity = self.getGroupUserIdentity(is_admin, user_id, owner)
                 formatted_time = get_formatted_time()
                 sign_in_count = db_user.query_sign_in_count()[0]  # 获取签到次数的第一个元素
-                hitokoto_data = get_hitokoto()
+                one_sentence_data = get_one_sentence()
 
-                # 默认值，防止hitokoto获取失败造成错误
-                hitokoto = "今日一言获取失败"
-                hitokoto_source = "未知"
+                # 默认值，防止one_sentence获取失败造成错误
+                one_sentence = "今日一言获取失败"
+                one_sentence_source = "未知"
 
-                if hitokoto_data:
-                    hitokoto = hitokoto_data.get("hitokoto", "今日一言获取失败")
-                    hitokoto_source = f"————{hitokoto_data.get('from', '未知')} - {hitokoto_data.get('from_who', '未知')}"
+                if one_sentence_data:
+                    one_sentence = one_sentence_data.get("tangdouz", "今日一言获取失败")
+                    one_sentence_source = f"————{one_sentence_data.get('from', '未知')} - {one_sentence_data.get('from_who', '未知')}"
 
                 last_sign_in_date = db_user.query_last_sign_in_date()
                 today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -160,8 +158,8 @@ class EconomicPlugin(Star):
                 ]
 
                 bottom_right_bottom_info = [
-                    hitokoto,
-                    hitokoto_source,
+                    one_sentence,
+                    one_sentence_source,
                 ]
 
                 sign_image = create_check_in_card(
