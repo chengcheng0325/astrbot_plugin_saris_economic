@@ -19,7 +19,9 @@
 
 *  [astrbot_plugin_saris_db](https://github.com/chengcheng0325/astrbot_plugin_saris_db) v0.1.2
 
+::: 画览
 ## 展示
 
 ![b866f6082ce61700f34dd0d90695bc3f](https://github.com/user-attachments/assets/48889f42-cc2e-4eb9-b91a-884e21fac35e)
 ![f7efc83790b6bd22da6f31f2ab85a073](https://github.com/user-attachments/assets/403285d6-68a8-4229-9497-6694caa26959)
+:::
