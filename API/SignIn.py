@@ -62,6 +62,19 @@ def create_check_in_card(
 ):
     """
     生成签到图。
+    Args:
+        avatar_path: 头像路径，可以是本地路径或网络路径。
+        user_info: 签到用户信息，包含姓名、学号、班级。
+        bottom_left_info: 签到卡片左下角。
+        bottom_right_top_info: 签到卡片右上角。
+        bottom_right_bottom_info: 签到卡片右下角信息。
+        output_path: 输出路径，默认为 "check_in_card.png"。
+        image_folder: 背景图片文件夹路径，默认为 "images"。
+        card_width: 签到卡片宽度，默认为 1200。
+        card_height: 签到卡片高度，默认为 630。
+        avatar_size: 头像大小，默认为 150。
+        avatar_radius: 头像圆角半径，默认为 30。
+        font_path: 字体文件路径，默认为 "path/to/your/font.ttf"。
     """
     try:
         # 1. 选择背景图片

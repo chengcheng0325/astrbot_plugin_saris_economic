@@ -2,7 +2,10 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.api.all import *
-from .SignIn import create_check_in_card
+import astrbot.api.message_components as Comp
+
+from .API.SignIn import create_check_in_card
+
 import os
 import datetime
 import requests
@@ -10,6 +13,59 @@ import json
 import time
 import random
 import re
+
+    # 自定义的 Jinja2 模板，支持 CSS
+TMPL = '''
+<style>
+/*  inventory 类：整个背包容器的样式 */
+.inventory {
+    display: grid; /* 使用 grid 布局 */
+    grid-template-columns: repeat(5, 1fr); /* 定义 grid 布局的列：重复 5 列，每列宽度相同 */
+    grid-gap: 10px; /* 设置 grid 单元格之间的间距 */
+    padding: 10px; /* 设置容器的内边距 */
+    border: 1px solid #ccc; /* 设置容器的边框 */
+    background-color: #f9f9f9; /* 设置容器的背景颜色 */
+    font-size: 32px; /* 增加了整个背包的默认字体大小 */
+}
+
+/* inventory-item 类：每个物品栏的样式 */
+.inventory-item {
+    border: 1px solid #ddd; /* 设置物品栏的边框 */
+    padding: 5px; /* 设置物品栏的内边距 */
+    text-align: left; /* 设置文本对齐方式为左对齐 */
+    font-size: 24px; /* 设置物品栏内的字体大小 */
+    background-color: #fff; /* 设置物品栏的背景颜色 */
+}
+
+/* inventory-item p 类：物品栏内段落的样式 */
+.inventory-item p {
+    margin: 5px 0; /* 设置段落的上下外边距，调整段落间距 */
+}
+
+/* inventory-item strong 类：物品栏内加粗文字的样式 */
+.inventory-item strong {
+    font-size: 24px; /* 设置加粗标签的字体大小 */
+}
+</style>
+
+<div class="inventory">
+{% for item in items %}  <!-- 循环遍历 items 列表中的每个 item -->
+    <div class="inventory-item"> <!-- 每个物品栏 -->
+        <p><strong>ID:</strong> {{ item.id }}</p> <!-- 显示物品的 ID -->
+        <p><strong>UserId:</strong> {{ item.user_id }}</p> <!-- 显示物品的 UserId -->
+        <p><strong>物品名称:</strong> {{ item.item_name }}</p> <!-- 显示物品的名称 -->
+        <p><strong>物品数量:</strong> {{ item.item_count }}</p> <!-- 显示物品的数量 -->
+        <p><strong>物品类型:</strong> {{ item.item_type }}</p> <!-- 显示物品的类型 -->
+        <p><strong>物品价值:</strong> {{ item.item_value }}</p> <!-- 显示物品的价值 -->
+        <p><strong>物品耐久度:</strong> {{ item.item_max_durability }}</p> <!-- 显示物品的最大耐久度 -->
+        <p><strong>物品当前耐久度:</strong> {{ item.item_current_durability }}</p> <!-- 显示物品的当前耐久度 -->
+        <p><strong>物品使用状态:</strong> {% if item.item_use_status == 0 %} 未使用/不能使用 {% else %} 使用中 {% endif %}</p> <!-- 显示物品的使用状态：如果 item_use_status 为 0，则显示“未使用/不能使用”，否则显示“使用中” -->
+    </div>
+{% endfor %} <!-- 结束循环 -->
+</div>
+'''
+
+
 
 
 # 路径配置
@@ -58,14 +114,29 @@ def get_one_sentence():
     return None
 
 
-@register("Economic", "城城", "经济插件", "0.2.4")
+@register("Economic", "城城", "经济插件", "1.0.0")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
+        os.makedirs(OUTPUT_PATH, exist_ok=True)
+        logger.info("------ saris_Economic ------")
+        logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
+        logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
+        logger.info("或加作者QQ: 3079233608 进行反馈。")
+        logger.info("------ saris_Economic ------")
         self._init_env()
+            
+
+
+    def _init_env(self):
+        """
+        初始化插件环境，确保输出路径存在。
+        """
         self.database_plugin = self.context.get_registered_star("saris_db")
+        self.fish_plugin = self.context.get_registered_star("saris_fish")
+        # 数据库插件
         if not self.database_plugin or not self.database_plugin.activated:
-            logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_saris_db.\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_saris_db")
+            logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_saris_db.\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             self.database_plugin_config = None  # 为了避免后续使用未初始化的属性
             self.database_plugin_activated = False
         else:
@@ -74,19 +145,12 @@ class EconomicPlugin(Star):
             from data.plugins.astrbot_plugin_saris_db.main import open_databases, DATABASE_FILE
             self.open_databases = open_databases
             self.DATABASE_FILE = DATABASE_FILE
-            
-
-
-    def _init_env(self):
-        """
-        初始化插件环境，确保输出路径存在。
-        """
-        os.makedirs(OUTPUT_PATH, exist_ok=True)
-        logger.info("------ saris_Economic ------")
-        logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
-        logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
-        logger.info("或加作者QQ: 3079233608 进行反馈。")
-        logger.info("------ saris_Economic ------")
+        # 钓鱼插件
+        if not self.fish_plugin or not self.fish_plugin.activated:
+            self.fish_plugin_activated = False
+        else:
+            self.fish_plugin_activated = True
+        # print(f"钓鱼插件激活状态：{self.fish_plugin_activated}")
 
     def getGroupUserIdentity(self, is_admin: bool, user_id: str, owner: str):
         """
@@ -99,19 +163,21 @@ class EconomicPlugin(Star):
         else:
             return "普通用户"
 
+    # -------------------------- 签到功能 --------------------------
     @filter.command("签到",alias={'info', 'sign'})
     async def sign_in(self, event: AstrMessageEvent):
         """
         签到功能：
         - 生成签到卡片并发送。
         """
+        self._init_env()
         if not self.database_plugin_activated:
-            yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/Astron/Astron-packages/tree/main/astrbot_plugin_saris_db")
+            yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
 
         user_id = event.get_sender_id()
         try:
-            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish):
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
                 user_name = event.get_sender_name()
                 group = await event.get_group(group_id=event.message_obj.group_id)
                 owner = group.group_owner
@@ -131,7 +197,7 @@ class EconomicPlugin(Star):
 
                 last_sign_in_date = db_user.query_last_sign_in_date()
                 today = datetime.datetime.now().strftime("%Y-%m-%d")
-                user_economy = db_economy.get_economy()[0]
+                user_economy = db_economy.get_economy()
 
                 sign_in_reward = 0  # 签到奖励
                 is_signed_today = (last_sign_in_date == today)
@@ -176,6 +242,213 @@ class EconomicPlugin(Star):
         except Exception as e:
             logger.exception(f"用户 {user_id} 签到失败: {e}")
             yield event.plain_result("签到时发生错误，请稍后再试。")
+    
+
+    # -------------------------- 商店功能 --------------------------
+    @filter.command_group("store", alias={'商店'})
+    def Store(self):
+        pass
+
+    @Store.command("基础")
+    async def store(self, event: AstrMessageEvent):
+        """
+        基础商店功能：
+        - 显示基础商店。
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                yield event.plain_result("制作中...")
+        except Exception as e:
+            logger.exception(f" {e}")
+    
+    @Store.command("钓鱼", alias={'渔具'})
+    async def fish_store(self, event: AstrMessageEvent):
+        """
+        钓鱼商店功能：
+        - 显示钓鱼商店。
+        - 赛博钓鱼插件需要加载。
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                fish_store = db_store.get_all_fish_store()
+                node = [Comp.Node(
+                    uin=542909524,
+                    name="saris",
+                    content=[
+                        Comp.Plain("----- 钓鱼商店 ----"),
+                    ]
+                )]
+                for fish in fish_store:
+                    test = f"ID: {fish[0]}\n名称: {fish[1]}\n类型: {fish[3]}\n价格: {fish[4]}\n数量: {fish[2]}\n耐久：{fish[5]}"
+                    node.append(Comp.Node(
+                        uin=542909524,
+                        name="saris",   
+                        content=[
+                            Comp.Plain(test)
+                        ]
+                    ))
+                yield event.chain_result([Comp.Nodes(node)])
+        except Exception as e:
+            logger.exception(f"{e}")
+    
+
+
+    # -------------------------- 购买功能 --------------------------
+    @filter.command_group("购买", alias={'buy'})
+    def buy(self):
+        pass
+
+
+    @buy.command("渔具", alias={'钓鱼'})
+    async def fish(self, event: AstrMessageEvent, ID: int):
+        """
+        购买功能：
+        - 购买渔具。
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+        
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_store.get_fish_store_item(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                ItemValue = iteam[4]
+                if ItemValue > db_economy.get_economy():
+                    yield event.plain_result("您的金币不足。")
+                    return
+                db_economy.reduce_economy(ItemValue)
+                if iteam[3] == "鱼竿":
+                    db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4], iteam[5], iteam[5], 0)
+                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
+                else:
+                    Iteam = db_backpack.query_backpack_ItemName(iteam[1])
+                    if Iteam is None:
+                        db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4], iteam[5], iteam[5], 0)
+                        yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
+                    else:
+                        db_backpack.update_backpack_item_count(iteam[2], iteam[1])
+                        yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}\n物品数量: {Iteam[3]+iteam[2]}[+{Iteam[3]}]\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
+                # yield event.plain_result("制作中...")
+        except Exception as e:
+            logger.exception(f" {e}")
+
+
+    # -------------------------- 装备功能 --------------------------
+    @filter.command_group("使用", alias={'use', '装备'})
+    def use(self):
+        pass
+
+    @use.command("渔具", alias={'钓鱼'})
+    async def equip(self, event: AstrMessageEvent, ID: int):
+        """
+        装备功能：
+        - 使用装备。
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，装备功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+        
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                user_backpack = db_backpack.query_backpack()
+                user_item = db_backpack.query_backpack_ID(ID)
+                text = ""
+                if not user_item:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                if user_item[4] != "鱼竿" and user_item[4] != "鱼饵" and user_item[4] != "饰品":
+                    yield event.plain_result("该物品不能装备。")
+                    return
+                if user_item[8] == 1:
+                    yield event.plain_result("该物品已使用。")
+                    return
+                for item in user_backpack:
+                    if user_item[4] == item[4]:
+                        if item[8] == 1:
+                            text += f"物品{item[0]}{item[2]}已帮你卸下了。\n"
+                            db_backpack.unequip(item[0])
+                db_backpack.equip(ID)
+                text += f"物品{user_item[0]}{user_item[2]}已帮你装备上了。\n"
+                yield event.plain_result(text)
+        except Exception as e:
+            logger.exception(f" {e}")
+
+
+    # -------------------------- 背包功能 --------------------------
+    @filter.command("我的背包", alias={'背包', 'backpack'})
+    async def backpack(self, event: AstrMessageEvent):
+        """
+        背包功能：
+        - 显示背包。
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，背包功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                backpack = db_backpack.query_backpack()
+                # print(backpack)
+                if not backpack:
+                    yield event.plain_result("您的背包为空。")
+                    return
+                backpack_data = []
+                for item in backpack:
+                    inventory_data = {
+                        "id": item[0],
+                        "user_id": item[1],
+                        "item_name": item[2],
+                        "item_count": item[3],
+                        "item_type": item[4],
+                        "item_value": item[5],
+                        "item_max_durability": item[6],
+                        "item_current_durability": item[7],
+                        "item_use_status": item[8]
+                    }
+                    backpack_data.append(inventory_data)
+                url = await self.html_render(TMPL, {"items": backpack_data})
+                yield event.image_result(url)
+        except Exception as e:
+            logger.exception(f"我的背包功能失败: {e}")
+
+
+
+    
+
+
+
+
+
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
