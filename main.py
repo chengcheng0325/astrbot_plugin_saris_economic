@@ -20,12 +20,12 @@ TMPL = '''
 /*  inventory 类：整个背包容器的样式 */
 .inventory {
     display: grid; /* 使用 grid 布局 */
-    grid-template-columns: repeat(5, 1fr); /* 定义 grid 布局的列：重复 5 列，每列宽度相同 */
+    grid-template-columns: repeat(5, 360px); /* 定义 grid 布局的列：重复 5 列，每列宽度相同 */
     grid-gap: 10px; /* 设置 grid 单元格之间的间距 */
     padding: 10px; /* 设置容器的内边距 */
     border: 1px solid #ccc; /* 设置容器的边框 */
     background-color: #f9f9f9; /* 设置容器的背景颜色 */
-    font-size: 32px; /* 增加了整个背包的默认字体大小 */
+    font-size: 48px; /* 增加了整个背包的默认字体大小 */
 }
 
 /* inventory-item 类：每个物品栏的样式 */
@@ -33,7 +33,7 @@ TMPL = '''
     border: 1px solid #ddd; /* 设置物品栏的边框 */
     padding: 5px; /* 设置物品栏的内边距 */
     text-align: left; /* 设置文本对齐方式为左对齐 */
-    font-size: 24px; /* 设置物品栏内的字体大小 */
+    font-size: 36px; /* 设置物品栏内的字体大小 */
     background-color: #fff; /* 设置物品栏的背景颜色 */
 }
 
@@ -44,7 +44,17 @@ TMPL = '''
 
 /* inventory-item strong 类：物品栏内加粗文字的样式 */
 .inventory-item strong {
-    font-size: 24px; /* 设置加粗标签的字体大小 */
+    font-size: 36px; /* 设置加粗标签的字体大小 */
+}
+
+/*  状态为 False 时的样式（红色） */
+.status-false {
+    color: red; /*  设置文本颜色为红色 */
+}
+
+/*  状态为 True 时的样式（绿色） */
+.status-true {
+    color: green; /*  设置文本颜色为绿色 */
 }
 </style>
 
@@ -56,14 +66,24 @@ TMPL = '''
         <p><strong>物品名称:</strong> {{ item.item_name }}</p> <!-- 显示物品的名称 -->
         <p><strong>物品数量:</strong> {{ item.item_count }}</p> <!-- 显示物品的数量 -->
         <p><strong>物品类型:</strong> {{ item.item_type }}</p> <!-- 显示物品的类型 -->
+        {% if item.fish_power > 0 %}  <!--  判断是否存在渔力，如果渔力大于0则显示 -->
+            <p><strong>渔力:</strong> {{ item.fish_power }}</p> <!--  显示物品的渔力 -->
+        {% endif %}
         <p><strong>物品价值:</strong> {{ item.item_value }}</p> <!-- 显示物品的价值 -->
-        <p><strong>物品耐久度:</strong> {{ item.item_max_durability }}</p> <!-- 显示物品的最大耐久度 -->
-        <p><strong>物品当前耐久度:</strong> {{ item.item_current_durability }}</p> <!-- 显示物品的当前耐久度 -->
-        <p><strong>物品使用状态:</strong> {% if item.item_use_status == 0 %} 未使用/不能使用 {% else %} 使用中 {% endif %}</p> <!-- 显示物品的使用状态：如果 item_use_status 为 0，则显示“未使用/不能使用”，否则显示“使用中” -->
+
+        {% if item.item_max_durability > 0 or item.item_current_durability > 0 %} <!-- 如果最大耐久度或当前耐久度大于 0，则显示耐久度信息 -->
+            <p><strong>物品耐久度:</strong> {{ item.item_max_durability }} / {{ item.item_current_durability }}</p> <!-- 显示物品耐久度 -->
+        {% endif %}
+
+        <p><strong>物品使用状态:</strong> <span class="status-{% if item.item_use_status == 0 %}false{% else %}true{% endif %}">{% if item.item_use_status == 0 %} False {% else %} True {% endif %}</span></p> <!-- 显示物品的使用状态：如果 item_use_status 为 0，则显示“False”，否则显示“True”，并根据状态应用不同的 CSS 类 -->
     </div>
 {% endfor %} <!-- 结束循环 -->
 </div>
 '''
+
+
+
+
 
 
 
@@ -114,18 +134,18 @@ def get_one_sentence():
     return None
 
 
-@register("Economic", "城城", "经济插件", "1.0.0")
+@register("Economic", "城城", "经济插件", "1.1.0")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         os.makedirs(OUTPUT_PATH, exist_ok=True)
         logger.info("------ saris_Economic ------")
+        self._init_env()
         logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
         logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
         logger.info("或加作者QQ: 3079233608 进行反馈。")
         logger.info("------ saris_Economic ------")
-        self._init_env()
-            
+
 
 
     def _init_env(self):
@@ -137,6 +157,7 @@ class EconomicPlugin(Star):
         # 数据库插件
         if not self.database_plugin or not self.database_plugin.activated:
             logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_saris_db.\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            logger.error("如果你安装了此插件请忽略此提示。")
             self.database_plugin_config = None  # 为了避免后续使用未初始化的属性
             self.database_plugin_activated = False
         else:
@@ -247,13 +268,19 @@ class EconomicPlugin(Star):
     # -------------------------- 商店功能 --------------------------
     @filter.command_group("store", alias={'商店'})
     def Store(self):
+        """
+        商店功能：
+        - 基础 [购买基础物品]
+        - 钓鱼 [购买钓鱼物品]
+            - 鱼竿 [购买鱼竿]
+            - 鱼饵 [购买鱼饵]
+        """
         pass
 
     @Store.command("基础")
     async def store(self, event: AstrMessageEvent):
         """
-        基础商店功能：
-        - 显示基础商店。
+        - 基础 [购买基础物品] 制作中...
         """
         self._init_env()
         if not self.database_plugin_activated:
@@ -267,12 +294,17 @@ class EconomicPlugin(Star):
         except Exception as e:
             logger.exception(f" {e}")
     
-    @Store.command("钓鱼", alias={'渔具'})
-    async def fish_store(self, event: AstrMessageEvent):
+    @Store.group("渔具", alias={'钓鱼'})
+    def fish_store():
         """
-        钓鱼商店功能：
-        - 显示钓鱼商店。
-        - 赛博钓鱼插件需要加载。
+        渔具商店
+        """
+        pass
+
+    @fish_store.command("鱼竿", alias={'钓竿'})
+    async def fishing_rod_store(self, event: AstrMessageEvent):
+        """
+        鱼竿商店
         """
         self._init_env()
         if not self.database_plugin_activated:
@@ -281,23 +313,62 @@ class EconomicPlugin(Star):
         if not self.fish_plugin_activated:
             yield event.plain_result("赛博钓鱼插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
             return
-
+        bot_id = int(event.get_self_id())
         user_id = event.get_sender_id()
         try:
             with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
-                fish_store = db_store.get_all_fish_store()
+                fish_store = db_store.get_all_fishing_rod_store()
                 node = [Comp.Node(
-                    uin=542909524,
+                    uin=bot_id,
                     name="saris",
                     content=[
-                        Comp.Plain("----- 钓鱼商店 ----"),
+                        Comp.Plain("----- 鱼竿商店 ----"),
                     ]
                 )]
                 for fish in fish_store:
-                    test = f"ID: {fish[0]}\n名称: {fish[1]}\n类型: {fish[3]}\n价格: {fish[4]}\n数量: {fish[2]}\n耐久：{fish[5]}"
+                    渔力 = db_fish.get_fishing_pole_by_kind(fish[1])[2]
+                    test = f"ID: {fish[0]}\n名称: {fish[1]}\n类型: {fish[3]}\n渔力: {渔力}\n价格: {fish[4]}\n数量: {fish[2]}\n耐久：{fish[5]}"
                     node.append(Comp.Node(
-                        uin=542909524,
-                        name="saris",   
+                        uin=bot_id,
+                        name="saris",
+                        content=[
+                            Comp.Plain(test)
+                        ]
+                    ))
+                yield event.chain_result([Comp.Nodes(node)])
+        except Exception as e:
+            logger.exception(f"{e}")
+        
+    @fish_store.command("鱼饵", alias={'钓饵'})
+    async def bait_store(self, event: AstrMessageEvent):
+        """
+        鱼饵商店
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+        bot_id = int(event.get_self_id())
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                fish_store = db_store.get_all_bait_store()
+                node = [Comp.Node(
+                    uin=bot_id,
+                    name="saris",
+                    content=[
+                        Comp.Plain("----- 鱼饵商店 ----"),
+                    ]
+                )]
+                for fish in fish_store:
+                    渔力 = db_fish.get_bait_by_kind(fish[1])[2]
+                    test = f"ID: {fish[0]}\n名称: {fish[1]}\n类型: {fish[3]}\n渔力: {渔力}\n价格: {fish[4]}\n数量: {fish[2]}"
+                    node.append(Comp.Node(
+                        uin=bot_id,
+                        name="saris",
                         content=[
                             Comp.Plain(test)
                         ]
@@ -313,12 +384,14 @@ class EconomicPlugin(Star):
     def buy(self):
         pass
 
+    @buy.group("渔具")
+    def fish_buy():
+        pass
 
-    @buy.command("渔具", alias={'钓鱼'})
-    async def fish(self, event: AstrMessageEvent, ID: int):
+    @fish_buy.command("鱼竿", alias={'钓竿'})
+    async def fishing_rod_buy(self, event: AstrMessageEvent, ID: int):
         """
-        购买功能：
-        - 购买渔具。
+        - 购买鱼竿。
         """
         self._init_env()
         if not self.database_plugin_activated:
@@ -331,7 +404,7 @@ class EconomicPlugin(Star):
         user_id = event.get_sender_id()
         try:
             with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
-                iteam = db_store.get_fish_store_item(ID)
+                iteam = db_store.get_fishing_rod_store_item(ID)
                 if not iteam:
                     yield event.plain_result("该物品不存在。")
                     return
@@ -340,18 +413,43 @@ class EconomicPlugin(Star):
                     yield event.plain_result("您的金币不足。")
                     return
                 db_economy.reduce_economy(ItemValue)
-                if iteam[3] == "鱼竿":
-                    db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4], iteam[5], iteam[5], 0)
-                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
+                iteam_id = db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4], iteam[5], iteam[5], 0)
+                yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{iteam_id}]\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
+        except Exception as e:
+            logger.exception(f" {e}")
+
+    @fish_buy.command("鱼饵", alias={'钓饵'})
+    async def bait_buy(self, event: AstrMessageEvent, ID: int):
+        """
+        - 购买鱼饵。
+        """
+        self._init_env()
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+        
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_store.get_bait_store_item(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                ItemValue = iteam[4]
+                if ItemValue > db_economy.get_economy():
+                    yield event.plain_result("您的金币不足。")
+                    return
+                db_economy.reduce_economy(ItemValue)
+                Iteam = db_backpack.query_backpack_ItemName(iteam[1])
+                if Iteam is None:
+                    iteam_id = db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4])
+                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{iteam_id}]\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
                 else:
-                    Iteam = db_backpack.query_backpack_ItemName(iteam[1])
-                    if Iteam is None:
-                        db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4], iteam[5], iteam[5], 0)
-                        yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
-                    else:
-                        db_backpack.update_backpack_item_count(iteam[2], iteam[1])
-                        yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}\n物品数量: {Iteam[3]+iteam[2]}[+{Iteam[3]}]\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}\n物品耐久度: {iteam[5]}\n物品当前耐久度: {iteam[5]}")
-                # yield event.plain_result("制作中...")
+                    db_backpack.update_backpack_item_count(iteam[2], Iteam[0])
+                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{Iteam[0]}]\n物品数量: {Iteam[3]+iteam[2]}[+{iteam[2]}]\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
         except Exception as e:
             logger.exception(f" {e}")
 
@@ -393,10 +491,10 @@ class EconomicPlugin(Star):
                 for item in user_backpack:
                     if user_item[4] == item[4]:
                         if item[8] == 1:
-                            text += f"物品{item[0]}{item[2]}已帮你卸下了。\n"
+                            text += f"物品[{item[0]}]{item[2]}已帮你卸下了。\n"
                             db_backpack.unequip(item[0])
                 db_backpack.equip(ID)
-                text += f"物品{user_item[0]}{user_item[2]}已帮你装备上了。\n"
+                text += f"物品[{user_item[0]}]{user_item[2]}已帮你装备上了。\n"
                 yield event.plain_result(text)
         except Exception as e:
             logger.exception(f" {e}")
@@ -424,12 +522,18 @@ class EconomicPlugin(Star):
                     return
                 backpack_data = []
                 for item in backpack:
+                    渔力 = 0
+                    if item[4] == "鱼竿":
+                        渔力 = db_fish.get_fishing_pole_by_kind(item[2])[2]
+                    elif item[4] == "鱼饵":
+                        渔力 = db_fish.get_bait_by_kind(item[2])[2]
                     inventory_data = {
                         "id": item[0],
                         "user_id": item[1],
                         "item_name": item[2],
                         "item_count": item[3],
                         "item_type": item[4],
+                        "fish_power": 渔力,
                         "item_value": item[5],
                         "item_max_durability": item[6],
                         "item_current_durability": item[7],
@@ -440,10 +544,6 @@ class EconomicPlugin(Star):
                 yield event.image_result(url)
         except Exception as e:
             logger.exception(f"我的背包功能失败: {e}")
-
-
-
-    
 
 
 
