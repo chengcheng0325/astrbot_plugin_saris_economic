@@ -5,6 +5,7 @@ from astrbot.api.all import *
 import astrbot.api.message_components as Comp
 
 from .API.SignIn import create_check_in_card
+from .API.maintenance import Equipment
 
 import os
 import datetime
@@ -535,6 +536,244 @@ class EconomicPlugin(Star):
         except Exception as e:
             logger.exception(f"我的背包功能失败: {e}")
 
+    # -------------------------- 开箱功能 -------------------------
+
+    @filter.command("开箱", alias={'open', 'box'})
+    async def open_box(self, event: AstrMessageEvent, ID: int, num: int = 1):
+        """
+        - 开箱子
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，开箱功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                user_backpack = db_backpack.query_backpack()
+                user_item = db_backpack.query_backpack_ID(ID)
+                text = ""
+                if not user_item:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                if user_item[4] != "箱子":
+                    yield event.plain_result("该物品不是箱子")
+                    return
+                if user_item[3] < num:
+                    yield event.plain_result(f"该物品数量不足{num}\n你当前拥有{user_item[3]}个。")
+                    return
+                if user_item[3] == num:
+                    db_backpack.delete_backpack(user_item[0])
+                else:
+                    db_backpack.update_backpack_item_count(-num, user_item[0])
+                for i in range(num):
+                    box_items = db_fish.get_box_by_name(user_item[2])
+                    text += f"------ 第{i+1}个箱子 ------\n"
+                    for item in box_items:
+                        print(item)
+                        if random.random() < item[6]:
+                            if item[3] == "钱":
+                                金币 = round(random.uniform(item[4], item[5]))
+                                text += f"获得金币: {金币}\n"
+                                db_economy.add_economy(金币)
+                            if item[3] == "鱼饵":
+                                Iteam = db_backpack.query_backpack_ItemName(item[2])
+                                鱼饵 = random.randint(item[4], item[5])
+                                price = db_fish.get_bait_by_kind(item[2])[3]
+                                if Iteam is None:
+                                    iteam_id = db_backpack.insert_backpack(item[2], 鱼饵, item[3], price)
+                                    text += f"获得{item[2]}[ID{iteam_id}]: {鱼饵}\n"
+                                else:
+                                    db_backpack.update_backpack_item_count(鱼饵, Iteam[0])
+                                    text += f"获得{item[2]}: {Iteam[3]+鱼饵}[+{鱼饵}]\n"
+                yield event.plain_result(text)
+        except Exception as e:
+            logger.exception(f" {e}")
+
+    
+    # -------------------------- 维修功能 --------------------------
+    @filter.command_group("维修", alias={'buy'})
+    def maintenance(self):
+        """
+        - 维修物品
+        """
+        pass
+
+    @maintenance.command("查询")
+    async def maintenance_query(self, event: AstrMessageEvent, ID: int):
+        """
+        - 查询鱼竿维修价格。
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_backpack.query_backpack_ID(ID)
+                # iteam = db_store.get_fishing_rod_store_item(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                if iteam[4] != "鱼竿":
+                    yield event.plain_result("该物品不是鱼竿。")
+                    return
+                fishing_pole = db_fish.get_fishing_pole_by_kind(iteam[2])
+                sword = Equipment(
+                    original_max=fishing_pole[5],
+                    current_max=iteam[6],
+                    current=iteam[7],
+                    original_value=fishing_pole[3]
+                )
+                all_repair_results = sword.simulate_all_repairs()
+                text = "----- 维修查询 -----\n"
+                translation = {
+                    'cost': '花费',
+                    'success': '是否可以维修',
+                    'new_current_max': '最大耐久度',
+                    'new_current': '当前耐久度',
+                    'repair_cost': '维修花费',
+                    'low': '低级维修',
+                    'medium': '中级维修',
+                    'high': '高级维修'
+                }
+                for level, data in all_repair_results.items():
+                    translated_level = translation.get(level, level)  # Translate the level
+                    text += f"维修等级: {translated_level}\n"
+                    for key, value in data.items():
+                        translated_key = translation.get(key, key)  # Translate the key
+                        text += f"  {translated_key}: {value}\n"
+                yield event.plain_result(text)
+        except Exception as e:
+            logger.exception(f" {e}")
+
+    @maintenance.command("低级")
+    async def maintenance_low(self, event: AstrMessageEvent, ID: int):
+        """
+        - 低级维修鱼竿。
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_backpack.query_backpack_ID(ID)
+                # iteam = db_store.get_fishing_rod_store_item(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                if iteam[4] != "鱼竿":
+                    yield event.plain_result("该物品不是鱼竿。")
+                    return
+                fishing_pole = db_fish.get_fishing_pole_by_kind(iteam[2])
+                sword = Equipment(
+                    original_max=fishing_pole[5],
+                    current_max=iteam[6],
+                    current=iteam[7],
+                    original_value=fishing_pole[3]
+                )
+                all_repair_results = sword.simulate_all_repairs()
+                current_value = all_repair_results['low']['simulated_current_value']
+                if float(all_repair_results['low']['cost']) > db_economy.get_economy():
+                    yield event.plain_result("低级维修金币不足")
+                    return
+                db_backpack.update_backpack_all(ID,current_value,all_repair_results['low']['new_current_max'])
+                db_economy.reduce_economy(round(float(all_repair_results['low']['cost']), 2))
+                yield event.plain_result("低级维修成功")
+        except Exception as e:
+            logger.exception(f" {e}")
+    
+    @maintenance.command("中级")
+    async def maintenance_medium(self, event: AstrMessageEvent, ID: int):
+        """
+        - 中级维修鱼竿。
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_backpack.query_backpack_ID(ID)
+                # iteam = db_store.get_fishing_rod_store_item(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                if iteam[4] != "鱼竿":
+                    yield event.plain_result("该物品不是鱼竿。")
+                    return
+                fishing_pole = db_fish.get_fishing_pole_by_kind(iteam[2])
+                sword = Equipment(
+                    original_max=fishing_pole[5],
+                    current_max=iteam[6],
+                    current=iteam[7],
+                    original_value=fishing_pole[3]
+                )
+                all_repair_results = sword.simulate_all_repairs()
+                current_value = all_repair_results['medium']['simulated_current_value']
+                if float(all_repair_results['medium']['cost']) > db_economy.get_economy():
+                    yield event.plain_result("中级维修金币不足")
+                    return
+                db_backpack.update_backpack_all(ID,current_value,all_repair_results['medium']['new_current_max'])
+                db_economy.reduce_economy(round(float(all_repair_results['medium']['cost']), 2))
+                yield event.plain_result("中级维修成功")
+        except Exception as e:
+            logger.exception(f" {e}")
+    
+    @maintenance.command("高级")
+    async def maintenance_high(self, event: AstrMessageEvent, ID: int):
+        """
+        - 高级维修鱼竿。
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        if not self.fish_plugin_activated:
+            yield event.plain_result("赛博钓鱼插件未加载，渔具购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_fish。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_fish")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_backpack.query_backpack_ID(ID)
+                # iteam = db_store.get_fishing_rod_store_item(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                if iteam[4] != "鱼竿":
+                    yield event.plain_result("该物品不是鱼竿。")
+                    return
+                fishing_pole = db_fish.get_fishing_pole_by_kind(iteam[2])
+                sword = Equipment(
+                    original_max=fishing_pole[5],
+                    current_max=iteam[6],
+                    current=iteam[7],
+                    original_value=fishing_pole[3]
+                    )
+                all_repair_results = sword.simulate_all_repairs()
+                current_value = all_repair_results['high']['simulated_current_value']
+                if float(all_repair_results['high']['cost']) > db_economy.get_economy():
+                    yield event.plain_result("高级维修金币不足")
+                    return
+                db_backpack.update_backpack_all(ID,current_value,all_repair_results['high']['new_current_max'])
+                db_economy.reduce_economy(round(float(all_repair_results['high']['cost']), 2))
+                yield event.plain_result("高级维修成功")
+        except Exception as e:
+            logger.exception(f" {e}")
+
 
 
 
@@ -542,4 +781,5 @@ class EconomicPlugin(Star):
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
+
         
