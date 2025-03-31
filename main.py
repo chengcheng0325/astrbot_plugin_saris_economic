@@ -134,30 +134,26 @@ def get_one_sentence():
     return None
 
 
-@register("Economic", "城城", "经济插件", "1.1.0")
+@register("Economic", "城城", "经济插件", "1.1.1")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         os.makedirs(OUTPUT_PATH, exist_ok=True)
+
+    @filter.on_astrbot_loaded()
+    async def on_astrbot_loaded(self):
+        """
+        插件初始化
+        """
         logger.info("------ saris_Economic ------")
-        self._init_env()
         logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
         logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
         logger.info("或加作者QQ: 3079233608 进行反馈。")
-        logger.info("------ saris_Economic ------")
-
-
-
-    def _init_env(self):
-        """
-        初始化插件环境，确保输出路径存在。
-        """
         self.database_plugin = self.context.get_registered_star("saris_db")
         self.fish_plugin = self.context.get_registered_star("saris_fish")
         # 数据库插件
         if not self.database_plugin or not self.database_plugin.activated:
             logger.error("经济插件缺少数据库插件，请先加载 astrbot_plugin_saris_db.\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
-            logger.error("如果你安装了此插件请忽略此提示。")
             self.database_plugin_config = None  # 为了避免后续使用未初始化的属性
             self.database_plugin_activated = False
         else:
@@ -171,7 +167,7 @@ class EconomicPlugin(Star):
             self.fish_plugin_activated = False
         else:
             self.fish_plugin_activated = True
-        # print(f"钓鱼插件激活状态：{self.fish_plugin_activated}")
+        logger.info("------ saris_Economic ------")
 
     def getGroupUserIdentity(self, is_admin: bool, user_id: str, owner: str):
         """
@@ -188,10 +184,8 @@ class EconomicPlugin(Star):
     @filter.command("签到",alias={'info', 'sign'})
     async def sign_in(self, event: AstrMessageEvent):
         """
-        签到功能：
-        - 生成签到卡片并发送。
+        - 签到 [生成签到卡片并发送]
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -266,14 +260,10 @@ class EconomicPlugin(Star):
     
 
     # -------------------------- 商店功能 --------------------------
-    @filter.command_group("store", alias={'商店'})
+    @filter.command_group("商店", alias={'store'})
     def Store(self):
         """
-        商店功能：
-        - 基础 [购买基础物品]
-        - 钓鱼 [购买钓鱼物品]
-            - 鱼竿 [购买鱼竿]
-            - 鱼饵 [购买鱼饵]
+        - 商店
         """
         pass
 
@@ -282,7 +272,6 @@ class EconomicPlugin(Star):
         """
         - 基础 [购买基础物品] 制作中...
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -297,16 +286,15 @@ class EconomicPlugin(Star):
     @Store.group("渔具", alias={'钓鱼'})
     def fish_store():
         """
-        渔具商店
+        - 渔具商店
         """
         pass
 
     @fish_store.command("鱼竿", alias={'钓竿'})
     async def fishing_rod_store(self, event: AstrMessageEvent):
         """
-        鱼竿商店
+        - 鱼竿商店
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -342,9 +330,8 @@ class EconomicPlugin(Star):
     @fish_store.command("鱼饵", alias={'钓饵'})
     async def bait_store(self, event: AstrMessageEvent):
         """
-        鱼饵商店
+        - 鱼饵商店
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，钓鱼商店功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -382,10 +369,16 @@ class EconomicPlugin(Star):
     # -------------------------- 购买功能 --------------------------
     @filter.command_group("购买", alias={'buy'})
     def buy(self):
+        """
+        - 购买物品
+        """
         pass
 
     @buy.group("渔具")
     def fish_buy():
+        """
+        - 购买渔具
+        """
         pass
 
     @fish_buy.command("鱼竿", alias={'钓竿'})
@@ -393,7 +386,6 @@ class EconomicPlugin(Star):
         """
         - 购买鱼竿。
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -423,7 +415,6 @@ class EconomicPlugin(Star):
         """
         - 购买鱼饵。
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，购买功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -457,15 +448,16 @@ class EconomicPlugin(Star):
     # -------------------------- 装备功能 --------------------------
     @filter.command_group("使用", alias={'use', '装备'})
     def use(self):
+        """
+        - 装备
+        """
         pass
 
     @use.command("渔具", alias={'钓鱼'})
     async def equip(self, event: AstrMessageEvent, ID: int):
         """
-        装备功能：
-        - 使用装备。
+        - 装备渔具
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，装备功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
@@ -504,10 +496,8 @@ class EconomicPlugin(Star):
     @filter.command("我的背包", alias={'背包', 'backpack'})
     async def backpack(self, event: AstrMessageEvent):
         """
-        背包功能：
-        - 显示背包。
+        - 背包
         """
-        self._init_env()
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，背包功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
