@@ -412,7 +412,7 @@ class EconomicPlugin(Star):
             logger.exception(f" {e}")
 
     @fish_buy.command("鱼饵", alias={'钓饵'})
-    async def bait_buy(self, event: AstrMessageEvent, ID: int):
+    async def bait_buy(self, event: AstrMessageEvent, ID: int, num: int = 1):
         """
         - 购买鱼饵。
         """
@@ -430,20 +430,54 @@ class EconomicPlugin(Star):
                 if not iteam:
                     yield event.plain_result("该物品不存在。")
                     return
-                ItemValue = iteam[4]
+                ItemValue = iteam[4] * num
                 if ItemValue > db_economy.get_economy():
                     yield event.plain_result("您的金币不足。")
                     return
                 db_economy.reduce_economy(ItemValue)
                 Iteam = db_backpack.query_backpack_ItemName(iteam[1])
                 if Iteam is None:
-                    iteam_id = db_backpack.insert_backpack(iteam[1], iteam[2], iteam[3], iteam[4])
-                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{iteam_id}]\n物品数量: {iteam[2]}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
+                    iteam_id = db_backpack.insert_backpack(iteam[1], iteam[2]*num, iteam[3], iteam[4], iteam[5], 0)
+                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{iteam_id}]\n物品数量: {iteam[2]*num}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
                 else:
-                    db_backpack.update_backpack_item_count(iteam[2], Iteam[0])
-                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{Iteam[0]}]\n物品数量: {Iteam[3]+iteam[2]}[+{iteam[2]}]\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
+                    db_backpack.update_backpack_item_count(iteam[2]*num, Iteam[0])
+                    yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{Iteam[0]}]\n物品数量: {Iteam[3]+iteam[2]*num}[+{iteam[2]*num}]\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
         except Exception as e:
             logger.exception(f" {e}")
+
+    # -------------------------- 出售功能 --------------------------
+    @filter.command("出售", alias={'sell'})
+    async def sell(self, event: AstrMessageEvent, ID: int, num: int = 1):
+        """
+        - 出售物品
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，出售功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                iteam = db_backpack.query_backpack_ID(ID)
+                if not iteam:
+                    yield event.plain_result("该物品不存在。")
+                    return
+                quantity = iteam[3]
+                if num > quantity:
+                    yield event.plain_result(f"{iteam[2]}[{iteam[0]}]数量不足{num}")
+                    return
+                if quantity == num:
+                    db_backpack.delete_backpack(ID)
+                else:
+                    db_backpack.update_backpack_item_count(-num,ID)
+                db_economy.add_economy(iteam[5]*num)
+                yield event.plain_result(f"出售成功\n物品名称: {iteam[2]}[{iteam[0]}]\n物品数量: {num}\n物品价值: {iteam[5]*num}")
+        except Exception as e:
+            logger.exception(f" {e}")
+
+
+
+
 
 
     # -------------------------- 装备功能 --------------------------
@@ -455,7 +489,7 @@ class EconomicPlugin(Star):
         pass
 
     @use.command("渔具", alias={'钓鱼'})
-    async def equip(self, event: AstrMessageEvent, ID: int):
+    async def equip(self, event: AstrMessageEvent, ID: int, num: int = 1):
         """
         - 装备渔具
         """
@@ -471,26 +505,56 @@ class EconomicPlugin(Star):
             with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
                 user_backpack = db_backpack.query_backpack()
                 user_item = db_backpack.query_backpack_ID(ID)
+                equipment = db_user.query_equipment_id(user_item[0])
+                if user_item[4] == "饰品":
+                    if num >= 1 and num <=3:
+                        equipment_type = db_user.query_equipment_type(user_item[4]+str(num))
+                        type_name = user_item[4]+str(num)
+                    else:
+                        yield event.plain_result("请输入正确的饰品栏位。")
+                        return
+                else:
+                    equipment_type = db_user.query_equipment_type(user_item[4])
+                    type_name = user_item[4]
                 text = ""
                 if not user_item:
                     yield event.plain_result("该物品不存在。")
                     return
-                if user_item[4] != "鱼竿" and user_item[4] != "鱼饵" and user_item[4] != "饰品":
+                if user_item[4] != "鱼竿" and user_item[4] != "鱼饵" and user_item[4] != "头盔" and user_item[4] != "胸甲" and user_item[4] != "护腿" and user_item[4] != "饰品":
                     yield event.plain_result("该物品不能装备。")
                     return
-                if user_item[8] == 1:
+                if user_item[8] == 1 and equipment is not None and equipment_type[3] != user_item[0]:
                     yield event.plain_result("该物品已使用。")
                     return
-                for item in user_backpack:
-                    if user_item[4] == item[4]:
-                        if item[8] == 1:
-                            text += f"物品[{item[0]}]{item[2]}已帮你卸下了。\n"
-                            db_backpack.unequip(item[0])
-                db_backpack.equip(ID)
-                text += f"物品[{user_item[0]}]{user_item[2]}已帮你装备上了。\n"
+                if user_item[4] != "饰品":
+                    db_user.update_equipment(type_name, user_item[0], user_item[2])
+                    for item in user_backpack:
+                        if user_item[4] == item[4]:
+                            if item[8] == 1:
+                                # text += f"物品[{item[0]}]{item[2]}已帮你卸下了。\n"
+                                db_backpack.unequip(item[0])
+                    db_backpack.equip(ID)
+                    text += f"物品[{user_item[0]}]{user_item[2]}已帮你装备上了。\n"
+                    # yield event.plain_result(text)
+                
+                else:
+                    # print(user_item[4])
+                    if equipment is not None and equipment[2] != type_name:
+                        db_backpack.unequip(equipment[2])
+                        db_user.remove_accessory(re.search(r'(\d+)\D*$',equipment[2]).group())
+                        # text += f"物品[{equipment[3]}]{equipment[4]}已帮你卸下了。\n"
+                        if equipment_type[3] != -1 and equipment_type[3] != user_item[0]:
+                            db_user.remove_accessory(str(num))
+                            # text += f"物品[{equipment_type[3]}]{equipment_type[4]}已帮你卸下了。\n"
+                    db_user.add_accessory(str(num), user_item[0], user_item[2])
+                    text += f"物品[{user_item[0]}]{user_item[2]}已帮你装备上了。\n"
+                
                 yield event.plain_result(text)
+
         except Exception as e:
-            logger.exception(f" {e}")
+            logger.exception(f"{e}")
+
+    
 
 
     # -------------------------- 背包功能 --------------------------
@@ -502,7 +566,7 @@ class EconomicPlugin(Star):
         if not self.database_plugin_activated:
             yield event.plain_result("数据库插件未加载，背包功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
             return
-
+        bot_id = int(event.get_self_id())
         user_id = event.get_sender_id()
         try:
             with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
@@ -531,10 +595,45 @@ class EconomicPlugin(Star):
                         "item_use_status": item[8]
                     }
                     backpack_data.append(inventory_data)
-                url = await self.html_render(TMPL, {"items": backpack_data})
-                yield event.image_result(url)
+                try:
+                    url = await self.html_render(TMPL, {"items": backpack_data})
+                    yield event.image_result(url)
+                except Exception as e:
+                    logger.error(f"背包数据渲染失败: {e}|使用合并转发功能")
+                    node = [Comp.Node(
+                        uin=bot_id,
+                        name="saris",
+                        content=[
+                            Comp.Plain("----- 背包 ----"),
+                        ]
+                    )]
+                    for backpack in backpack_data:
+                        formatted_string = f"ID: {backpack['id']}\n"
+                        formatted_string += f"user_id: {backpack['user_id']}\n"
+                        formatted_string += f"物品名称: {backpack['item_name']}\n"
+                        formatted_string += f"物品数量: {backpack['item_count']}\n"
+                        formatted_string += f"物品类型: {backpack['item_type']}\n"
+                        渔力 = backpack.get("渔力", 0)  # 使用get方法，避免KeyError
+                        if 渔力 > 0:
+                            formatted_string += f"渔力: {渔力}\n"
+                        formatted_string += f"物品价值: {backpack['item_value']}\n"
+                        item_max_durability = backpack.get("item_max_durability", 0)
+                        item_current_durability = backpack.get("item_current_durability", 0)
+                        if item_max_durability > 0 or item_current_durability > 0:
+                            formatted_string += f"物品耐久度: {item_max_durability}/{item_current_durability}\n"
+                        item_use_status = backpack['item_use_status']
+                        formatted_string += f"物品使用状态: {'True' if item_use_status != 0 else 'False'}"
+
+                        node.append(Comp.Node(
+                            uin=bot_id,
+                            name="saris",
+                            content=[
+                                Comp.Plain(formatted_string)
+                            ]
+                        ))
+                yield event.chain_result([Comp.Nodes(node)])
         except Exception as e:
-            logger.exception(f"我的背包功能失败: {e}")
+            logger.error(f"我的背包功能失败: {e}")
 
     # -------------------------- 开箱功能 -------------------------
 
