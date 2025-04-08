@@ -6,6 +6,7 @@ import astrbot.api.message_components as Comp
 
 from .API.SignIn import create_check_in_card
 from .API.maintenance import Equipment
+from .API.virtual_time import VirtualClock
 
 import os
 import datetime
@@ -467,6 +468,13 @@ class EconomicPlugin(Star):
                     yield event.plain_result(f"{iteam[2]}[{iteam[0]}]数量不足{num}")
                     return
                 if quantity == num:
+                    backpack = db_backpack.query_backpack_ID(ID)
+                    equipment = db_user.query_equipment_id(ID)
+                    if equipment is not None:
+                        if backpack[4] == "饰品":
+                            db_user.remove_accessory(re.search(r'(\d+)\D*$',equipment[2]).group())
+                        else:
+                            db_user.remove_accessory(backpack[4])
                     db_backpack.delete_backpack(ID)
                 else:
                     db_backpack.update_backpack_item_count(-num,ID)
@@ -685,6 +693,10 @@ class EconomicPlugin(Star):
                                 else:
                                     db_backpack.update_backpack_item_count(鱼饵, Iteam[0])
                                     text += f"获得{item[2]}: {Iteam[3]+鱼饵}[+{鱼饵}]\n"
+                            if item[3] == "饰品":
+                                price = db_fish.get_jewelry_by_kind(item[2])[3]
+                                iteam_id = db_backpack.insert_backpack(item[2], 1, item[3], price)
+                                text += f"获得{item[2]}[ID{iteam_id}]: {1}\n描述：{price[4]}\n"
                 yield event.plain_result(text)
         except Exception as e:
             logger.exception(f" {e}")
@@ -872,6 +884,46 @@ class EconomicPlugin(Star):
                 yield event.plain_result("高级维修成功")
         except Exception as e:
             logger.exception(f" {e}")
+
+    # -------------------------- 个人信息功能 --------------------------
+    @filter.command("我的信息", alias={'信息', 'info'})
+    async def info(self, event: AstrMessageEvent):
+        """
+        - 个人信息
+        """
+        if not self.database_plugin_activated:
+            yield event.plain_result("数据库插件未加载，个人信息功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+            return
+        user_id = event.get_sender_id()
+        try:
+            with self.open_databases(self.database_plugin_config, self.DATABASE_FILE, user_id) as (db_user, db_economy, db_fish, db_backpack, db_store):
+                user_economy = db_economy.get_economy()
+                user_backpack = db_backpack.query_backpack()
+                start_real = datetime.datetime(2025, 3, 31, 0, 0, 0)
+                start_virtual = datetime.datetime(2025, 1, 1, 0, 0, 0)
+                clock = VirtualClock(start_real,start_virtual,time_ratio=12)
+                clock_data = clock.get_virtual_clock_data()
+                virtual_time = clock_data["virtual_time1"]
+                # user_equipment = db_user.query_equipment_all()
+                text = f"----- 个人信息 -----\n"
+                text += f"金币: {user_economy}\n"
+                text += f"时间: "
+                if db_backpack.query_backpack_ItemName('怀表') is not None:
+                    text += f"{virtual_time} {clock_data['weekday']}\n"
+                else:
+                    text += f"没有怀表无法查看时间\n"
+                text += f"头盔：{db_user.query_equipment_type('头盔')[4]}\n"
+                text += f"胸甲：{db_user.query_equipment_type('胸甲')[4]}\n"
+                text += f"护腿：{db_user.query_equipment_type('护腿')[4]}\n"
+                text += f"鱼竿：{db_user.query_equipment_type('鱼竿')[4]}\n"
+                text += f"鱼饵：{db_user.query_equipment_type('鱼饵')[4]}\n"
+                text += f"饰品1：{db_user.query_equipment_type('饰品1')[4]}\n"
+                text += f"饰品2：{db_user.query_equipment_type('饰品2')[4]}\n"
+                text += f"饰品3：{db_user.query_equipment_type('饰品3')[4]}\n"
+                yield event.plain_result(text)
+
+        except Exception as e:
+            logger.error(f"我的背包功能失败: {e}")
 
 
 
