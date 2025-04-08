@@ -694,8 +694,8 @@ class EconomicPlugin(Star):
                                     db_backpack.update_backpack_item_count(鱼饵, Iteam[0])
                                     text += f"获得{item[2]}: {Iteam[3]+鱼饵}[+{鱼饵}]\n"
                             if item[3] == "饰品":
-                                price = db_fish.get_jewelry_by_kind(item[2])[3]
-                                iteam_id = db_backpack.insert_backpack(item[2], 1, item[3], price)
+                                price = db_fish.get_jewelry_by_kind(item[2])
+                                iteam_id = db_backpack.insert_backpack(item[2], 1, item[3], price[3])
                                 text += f"获得{item[2]}[ID{iteam_id}]: {1}\n描述：{price[4]}\n"
                 yield event.plain_result(text)
         except Exception as e:
