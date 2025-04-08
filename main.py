@@ -436,8 +436,8 @@ class EconomicPlugin(Star):
                     return
                 db_economy.reduce_economy(ItemValue)
                 Iteam = db_backpack.query_backpack_ItemName(iteam[1])
-                if Iteam is None:
-                    iteam_id = db_backpack.insert_backpack(iteam[1], iteam[2]*num, iteam[3], iteam[4], iteam[5], 0)
+                if Iteam is None: 
+                    iteam_id = db_backpack.insert_backpack(iteam[1], iteam[2]*num, iteam[3], iteam[4], 0, 0)
                     yield event.plain_result(f"购买成功\n物品名称: {iteam[1]}[{iteam_id}]\n物品数量: {iteam[2]*num}\n物品类型: {iteam[3]}\n物品价值: {iteam[4]}")
                 else:
                     db_backpack.update_backpack_item_count(iteam[2]*num, Iteam[0])
