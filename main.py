@@ -543,7 +543,10 @@ class EconomicPlugin(Star):
                     else:
                         db_backpack.update_backpack_item_count(items[3], 鱼饵[0])
 
-                
+                if num == items[3]:
+                    db_backpack.delete_trade(ID)
+                else:
+                    db_backpack.update_trade_item_count(-num, ID)
                 db_economy.reduce_economy(num * items[5])
                 db_economy.add_economy_UserId(items[1], num * items[5])
                 test = f"购买成功\n物品名称: {items[2]}[{items[0]}]\n物品数量: {num}\n单价：{items[5]}\n总价：{num * items[5]}\n卖家：{items[1]}"
