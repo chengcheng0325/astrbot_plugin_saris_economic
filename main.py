@@ -519,9 +519,9 @@ class EconomicPlugin(Star):
                     yield event.plain_result("您的金币不足。")
                     return
                 if items[4] == "鱼饵":
-                    鱼饵 = db_backpack.query_backpack_ItemName(items[3])
+                    鱼饵 = db_backpack.query_backpack_ItemName(items[2])
                     if 鱼饵 is None:
-                        db_backpack.insert_backpack(items[2], items[3], items[4], db_fish.get_bait_by_kind(items[2])[3], 0, 0)
+                        db_backpack.insert_backpack(items[2], num, items[4], db_fish.get_bait_by_kind(items[2])[3], 0, 0)
                     else:
                         db_backpack.update_backpack_item_count(num, 鱼饵[0])
                 if items[4] == "鱼竿":
@@ -539,9 +539,9 @@ class EconomicPlugin(Star):
                 if items[4] == "箱子":
                     箱子 = db_backpack.query_backpack_ItemName(items[2])
                     if 箱子 is None:
-                        db_backpack.insert_backpack(items[2], items[3], items[4], 10, 0, 0)
+                        db_backpack.insert_backpack(items[2], num, items[4], 10, 0, 0)
                     else:
-                        db_backpack.update_backpack_item_count(items[3], 箱子[0])
+                        db_backpack.update_backpack_item_count(num, 箱子[0])
 
                 if num == items[3]:
                     db_backpack.delete_trade(ID)
