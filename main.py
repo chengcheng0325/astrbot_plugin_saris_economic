@@ -541,7 +541,7 @@ class EconomicPlugin(Star):
                     if 箱子 is None:
                         db_backpack.insert_backpack(items[2], items[3], items[4], 10, 0, 0)
                     else:
-                        db_backpack.update_backpack_item_count(items[3], 鱼饵[0])
+                        db_backpack.update_backpack_item_count(items[3], 箱子[0])
 
                 if num == items[3]:
                     db_backpack.delete_trade(ID)
