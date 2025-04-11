@@ -5,13 +5,17 @@
 
 **作者：** [城城](https://github.com/chengcheng0325)
 
-**版本：** v1.5.3 (当前版本号)
+**版本：** v1.6.0 (当前版本号)
 
 ---
 
 ## 功能特性
 
- - [x] 签到 [获取签到图片,可以自定义背景图片[data\plugins\astrbot_plugin_economic\backgrounds]]
+ - [x] 签到 [获取签到图片]
+    * data\sign\background 目录下自定义背景图片
+    * data\sign\profile_picture 目录下储存用户头像
+    * data\sign\image 目录下储存签到图
+ - [x] 更新头像 [更新签到图头像]
  - [ ] 转账
  - [x] 商店 渔具 鱼竿|鱼饵 [查看商店商品列表,购买商品,目前只有渔具商店]
  - [x] 购买 渔具 鱼竿|鱼饵 [购买商店内物品]
@@ -27,9 +31,10 @@
 
 *  [astrbot_plugin_saris_db](https://github.com/chengcheng0325/astrbot_plugin_saris_db) v0.1.2
 
-::: 画览
-## 展示
 
-![b866f6082ce61700f34dd0d90695bc3f](https://github.com/user-attachments/assets/48889f42-cc2e-4eb9-b91a-884e21fac35e)
-![f7efc83790b6bd22da6f31f2ab85a073](https://github.com/user-attachments/assets/403285d6-68a8-4229-9497-6694caa26959)
-:::
+## 展示
+| 横板 | 竖版 |
+|---|---|
+| ![b866f6082ce61700f34dd0d90695bc3f](https://github.com/user-attachments/assets/48889f42-cc2e-4eb9-b91a-884e21fac35e) | ![f7efc83790b6bd22da6f31f2ab85a073](https://github.com/user-attachments/assets/403285d6-68a8-4229-9497-6694caa26959) |
+
+

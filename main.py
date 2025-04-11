@@ -98,7 +98,9 @@ FONT_PATH = os.path.join(PLUGIN_DIR, "font.ttf")
 
 # 确定输出路径：优先尝试当前工作目录下的 data/sign_image，否则使用插件目录
 RUNNING_SCRIPT_DIRECTORY = os.getcwd()
-OUTPUT_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, 'data', 'sign_image')
+IMAGE_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, 'data', 'sign', 'image')
+PP_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, 'data', 'sign', 'profile_picture')
+BACKGROUND_PATH = os.path.join(RUNNING_SCRIPT_DIRECTORY, 'data', 'sign', 'background')
 
 def get_formatted_time():
     """
@@ -135,12 +137,43 @@ def get_one_sentence():
             return None
     return None
 
+def download_image(user_id, PP_PATH, max_retries=3):
+    """
+    从给定的 URL 下载图像，并将其保存到指定路径。
+    Args:
+        user_id: 用户ID，用于构建文件名。
+        PP_PATH: 保存图像的目录路径。
+        max_retries: 最大重试次数（默认为3）。
+    Returns:
+        True 如果下载成功，否则返回 False。
+    """
+    url = f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640"
+    filepath = os.path.join(PP_PATH, f"{user_id}.png")
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, stream=True, timeout=10)  # 添加超时时间
+            response.raise_for_status()  # 检查响应状态码，如果不是 200，抛出异常
+            with open(filepath, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):  # 以流式方式写入文件
+                    f.write(chunk)
+            print(f"用户 {user_id} 的图像下载成功，已保存到 {filepath}")
+            return True  # 下载成功，返回 True
+        except requests.exceptions.RequestException as e:
+            print(f"用户 {user_id} 的图像下载失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)  # 等待 2 秒后重试
+            else:
+                print(f"用户 {user_id} 下载失败，达到最大重试次数。")
+    return False  # 下载失败，返回 False
+
 
 @register("Economic", "城城", "经济插件", "1.1.1")
 class EconomicPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        os.makedirs(OUTPUT_PATH, exist_ok=True)
+        os.makedirs(PP_PATH, exist_ok=True)
+        os.makedirs(IMAGE_PATH, exist_ok=True)
+        os.makedirs(BACKGROUND_PATH, exist_ok=True)
 
     @filter.on_astrbot_loaded()
     async def on_astrbot_loaded(self):
@@ -148,7 +181,9 @@ class EconomicPlugin(Star):
         插件初始化
         """
         logger.info("------ saris_Economic ------")
-        logger.info(f"经济插件已初始化，签到图输出路径设置为: {OUTPUT_PATH}")
+        logger.info(f"签到图背景图路径设置为: {BACKGROUND_PATH}")
+        logger.info(f"签到图用户头像路径设置为: {PP_PATH}")
+        logger.info(f"签到图输出路径设置为: {IMAGE_PATH}")
         logger.info(f"如果有问题，请在 https://github.com/chengcheng0325/astrbot_plugin_saris_economic/issues 提出 issue")
         logger.info("或加作者QQ: 3079233608 进行反馈。")
         self.database_plugin = self.context.get_registered_star("saris_db")
@@ -183,7 +218,7 @@ class EconomicPlugin(Star):
             return "普通用户"
 
     # -------------------------- 签到功能 --------------------------
-    @filter.command("签到",alias={'info', 'sign'})
+    @filter.command("签到",alias={'sign'})
     async def sign_in(self, event: AstrMessageEvent):
         """
         - 签到 [生成签到卡片并发送]
@@ -243,23 +278,56 @@ class EconomicPlugin(Star):
                     one_sentence_source,
                 ]
 
+                # 头像路径
+                pp = os.path.join(PP_PATH, f"{user_id}.png")
+                if os.path.exists(pp):
+                    avatar_path = pp
+                else:
+                    di = download_image(user_id, PP_PATH)
+                    if di:
+                        avatar_path = pp
+                    else:
+                        avatar_path = os.path.join(PLUGIN_DIR, "avatar.png")
+                # 背景图路径
+                files = os.listdir(BACKGROUND_PATH)
+                if len(files) == 0:
+                    image_folder=IMAGE_FOLDER
+                else:
+                    image_folder=BACKGROUND_PATH
+
+
                 sign_image = create_check_in_card(
-                    avatar_path=f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640",
+                    avatar_path=avatar_path,
                     user_info=user_info,
                     bottom_left_info=bottom_left_info,
                     bottom_right_top_info=bottom_right_top_info,
                     bottom_right_bottom_info=bottom_right_bottom_info,
-                    output_path=os.path.join(OUTPUT_PATH, f"{user_id}.png"),
-                    image_folder=IMAGE_FOLDER,
+                    output_path=os.path.join(IMAGE_PATH, f"{user_id}.png"),
+                    image_folder=image_folder,
                     font_path=FONT_PATH
                 )
                 yield event.image_result(sign_image)
-                logger.info(f"用户 {user_id} 签到成功，签到卡片已保存至 {os.path.join(OUTPUT_PATH, f'{user_id}.png')}")
+                logger.info(f"用户 {user_id} 签到成功，签到卡片已保存至 {os.path.join(PP_PATH, f'{user_id}.png')}")
 
         except Exception as e:
             logger.exception(f"用户 {user_id} 签到失败: {e}")
             yield event.plain_result("签到时发生错误，请稍后再试。")
     
+
+    @filter.command("更新头像")
+    async def sign_in(self, event: AstrMessageEvent):
+        """
+        - 更新头像 [更新签到图头像]
+        """
+        # if not self.database_plugin_activated:
+        #     yield event.plain_result("数据库插件未加载，签到功能无法使用。\n请先安装并启用 astrbot_plugin_saris_db。\n插件仓库地址：https://github.com/chengcheng0325/astrbot_plugin_saris_db")
+        #     return
+        user_id = event.get_sender_id()
+        di = download_image(user_id, PP_PATH)
+        if di:
+            yield event.plain_result("更新成功")
+        else:
+            yield event.plain_result("更新失败请稍后再试")
 
     # -------------------------- 商店功能 --------------------------
     @filter.command_group("商店", alias={'store'})
