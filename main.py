@@ -734,8 +734,8 @@ class EconomicPlugin(Star):
                         db_user.update_equipment(equipment[2], -1, "None")
                 else:
                     db_backpack.update_backpack_item_count(-num,ID)
-                iteam_id = db_backpack.insert_trade(iteam[2], iteam[3], iteam[4], price, iteam[6], iteam[7])
-                yield event.plain_result(f"上架成功\n物品名称: {iteam[2]}[{iteam_id}]\n物品数量: {iteam[3]}\n物品类型: {iteam[4]}\n物品价值: {price}\n物品耐久度: {iteam[6]}\n物品当前耐久度: {iteam[7]}")
+                iteam_id = db_backpack.insert_trade(iteam[2], num, iteam[4], price, iteam[6], iteam[7])
+                yield event.plain_result(f"上架成功\n物品名称: {iteam[2]}[{iteam_id}]\n物品数量: {num}\n物品类型: {iteam[4]}\n物品价值: {price}\n物品耐久度: {iteam[6]}\n物品当前耐久度: {iteam[7]}")
         except Exception as e:
             logger.exception(f" {e}")
 
@@ -767,9 +767,9 @@ class EconomicPlugin(Star):
                 if iteam[4] == "鱼饵":
                     鱼饵 = db_backpack.query_backpack_ItemName(iteam[2])
                     if 鱼饵 is None:
-                        db_backpack.insert_backpack(iteam[2], iteam[3], iteam[4], db_fish.get_bait_by_kind(iteam[2])[3], 0, 0)
+                        db_backpack.insert_backpack(iteam[2], num, iteam[4], db_fish.get_bait_by_kind(iteam[2])[3], 0, 0)
                     else:
-                        db_backpack.update_backpack_item_count(iteam[3], 鱼饵[0])
+                        db_backpack.update_backpack_item_count(num, 鱼饵[0])
                 if iteam[4] == "鱼竿":
                     fishing_pole_power = db_fish.get_fishing_pole_by_kind(iteam[2])
                     sword = Equipment(
@@ -781,13 +781,13 @@ class EconomicPlugin(Star):
                     current_value = round(sword.current_value, 2)
                     db_backpack.insert_backpack(iteam[2], 1, iteam[4], current_value, iteam[6], iteam[7])
                 if iteam[4] == "饰品":
-                    db_backpack.insert_backpack(iteam[2], iteam[3], iteam[4], db_fish.get_jewelry_by_kind(iteam[2])[3], 0, 0)
+                    db_backpack.insert_backpack(iteam[2], 1, iteam[4], db_fish.get_jewelry_by_kind(iteam[2])[3], 0, 0)
                 if iteam[4] == "箱子":
                     箱子 = db_backpack.query_backpack_ItemName(iteam[2])
                     if 箱子 is None:
-                        db_backpack.insert_backpack(iteam[2], iteam[3], iteam[4], 10, 0, 0)
+                        db_backpack.insert_backpack(iteam[2], num, iteam[4], 10, 0, 0)
                     else:
-                        db_backpack.update_backpack_item_count(iteam[3], 鱼饵[0])
+                        db_backpack.update_backpack_item_count(num, 鱼饵[0])
                 yield event.plain_result(f"下架成功\n物品名称: {iteam[2]}[{iteam[0]}]\n物品数量: {num}")
         except Exception as e:
             logger.exception(f" {e}")
