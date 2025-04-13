@@ -315,7 +315,7 @@ class EconomicPlugin(Star):
     
 
     @filter.command("更新头像")
-    async def sign_in(self, event: AstrMessageEvent):
+    async def update_sign(self, event: AstrMessageEvent):
         """
         - 更新头像 [更新签到图头像]
         """
